@@ -1,0 +1,13 @@
+build/
+out/
+.vs/
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+*.user
+*.suo
+x64/
+Release/
+Debug/
+*.dll
+!HowToFishInternal.dll
