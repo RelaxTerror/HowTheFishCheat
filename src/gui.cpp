@@ -1,6 +1,5 @@
 #include "gui.h"
 #include "cheats.h"
-#include "auth.h"
 #include "renderer.h"
 #include "silentaim.h"
 #include "fishspawn.h"
@@ -147,76 +146,11 @@ static bool SidebarItem(const char* id, const char* label, int icon, bool active
     return clicked;
 }
 
-static std::string AsciiTR(const std::string& s) {
-    // Varsayilan ImGui fontunda TR glif yok (? cikar), o yuzden cevir.
-    std::string o;
-    o.reserve(s.size());
-    for (size_t i = 0; i < s.size();) {
-        unsigned char c = s[i];
-        if (c < 0x80) { o += (char)c; ++i; continue; }
-        if (i + 1 < s.size()) {
-            unsigned char d = s[i + 1];
-            char r = 0;
-            if (c == 0xC4 && d == 0x9F) r = 'g';
-            else if (c == 0xC4 && d == 0x9E) r = 'G';
-            else if (c == 0xC4 && d == 0xB1) r = 'i';
-            else if (c == 0xC4 && d == 0xB0) r = 'I';
-            else if (c == 0xC5 && d == 0x9F) r = 's';
-            else if (c == 0xC5 && d == 0x9E) r = 'S';
-            else if (c == 0xC3 && d == 0xA7) r = 'c';
-            else if (c == 0xC3 && d == 0x87) r = 'C';
-            else if (c == 0xC3 && d == 0xB6) r = 'o';
-            else if (c == 0xC3 && d == 0x96) r = 'O';
-            else if (c == 0xC3 && d == 0xBC) r = 'u';
-            else if (c == 0xC3 && d == 0x9C) r = 'U';
-            if (r) { o += r; i += 2; continue; }
-        }
-        ++i; // bilinmeyen bayti atla
-    }
-    return o;
-}
-
-static void LoginPage() {
-    if (auth::IsAuthed()) {
-        auth::LicenseInfo info = auth::Info();
-        widgets::Section("Lisans");
-        ImGui::Text("Kullanici: %s", AsciiTR(info.username).c_str());
-        ImGui::Text("Seviye: %s   Durum: %s", AsciiTR(info.level).c_str(), AsciiTR(info.status).c_str());
-        ImGui::Text("Kalan gun: %d", info.days_left);
-        ImGui::TextDisabled("Bitis: %s", info.expiresAt.c_str());
-        ImGui::TextDisabled("%s", AsciiTR(auth::Status()).c_str());
-        if (ImGui::Button("Cikis Yap", ImVec2(220, 32))) auth::Logout();
-        widgets::Section("Duyurular");
-        std::vector<auth::Notice> items = auth::Notices();
-        if (items.empty()) ImGui::TextDisabled("Duyuru yok.");
-        for (size_t i = 0; i < items.size(); ++i) {
-            ImGui::TextColored(ImVec4(1, .55f, .15f, 1), "%s", AsciiTR(items[i].title).c_str());
-            ImGui::TextWrapped("%s", AsciiTR(items[i].body).c_str());
-            if (i + 1 < items.size()) ImGui::Separator();
-        }
-    } else {
-        widgets::Section("Lisans Girisi");
-        static char keyBuf[64] = { 0 };
-        ImGui::SetNextItemWidth(280.f);
-        ImGui::InputText("Lisans Anahtari", keyBuf, sizeof(keyBuf),
-                         ImGuiInputTextFlags_Password);
-        if (ImGui::Button("Giris Yap", ImVec2(220, 36))) auth::LoginAsync(keyBuf);
-        ImVec4 sc = auth::IsWorking() ? ImVec4(1, .8f, .3f, 1)
-                                      : ImVec4(1, .35f, .3f, 1);
-        ImGui::TextColored(sc, "%s", AsciiTR(auth::Status()).c_str());
-        ImGui::Spacing();
-        ImGui::TextDisabled("HWID: %s", auth::Hwid().c_str());
-        widgets::Hint("Anahtar ilk kullanimda bu cihaza kilitlenir.");
-    }
-}
-
 void Draw() {
     static bool styled = false;
     if (!styled) { ApplyModernStyle(); styled = true; }
-    static int page = 5; // varsayilan: Giris
+    static int page = 0; // varsayilan: Oyuncu
     auto& s = State();
-    bool locked = !auth::IsAuthed();
-    if (locked) page = 5;
     ImGui::SetNextWindowSize(ImVec2(720, 500), ImGuiCond_FirstUseEver);
     ImGui::SetNextWindowSizeConstraints(ImVec2(650, 430), ImVec2(1000, 760));
     ImGui::Begin("FISH CONTROL  //  v80", nullptr, ImGuiWindowFlags_NoCollapse);
@@ -227,15 +161,14 @@ void Draw() {
     ImGui::Spacing();
     ImGui::Separator();
     ImGui::Spacing();
-    const char* nav[] = { "Oyuncu", "Aim & ESP", "Fish Spawner", "Ekonomi", "Tani / Log", "Giris" };
-    const int navIcons[] = { 0, 1, 4, 2, 5, 5 };
-    // 6 sekme footer'siz alana her zaman sigsin diye yukseklik dinamik (footer ile cakisma olmaz)
+    const char* nav[] = { "Oyuncu", "Aim & ESP", "Fish Spawner", "Ekonomi", "Tani / Log" };
+    const int navIcons[] = { 0, 1, 4, 2, 5 };
+    // 5 sekme footer'siz alana her zaman sigsin diye yukseklik dinamik (footer ile cakisma olmaz)
     float footY = ImGui::GetWindowHeight() - 68.f;
-    float navH = (footY - ImGui::GetCursorPosY() - 5 * 3.f) / 6.f;
+    float navH = (footY - ImGui::GetCursorPosY() - 4 * 3.f) / 5.f;
     if (navH > 40.f) navH = 40.f;
     if (navH < 28.f) navH = 28.f;
-    for (int i = 0; i < 6; ++i) {
-        if (locked && i != 5) continue; // girissiz kullanim yok
+    for (int i = 0; i < 5; ++i) {
         if (SidebarItem(nav[i], nav[i], navIcons[i], page == i, navH)) page = i;
         ImGui::Dummy(ImVec2(0, 3));
     }
@@ -249,10 +182,10 @@ void Draw() {
     ImGui::SameLine();
 
     ImGui::BeginChild("##content", ImVec2(0, 0), false);
-    const char* titles[] = { "OYUNCU", "AIM & ESP", "FISH SPAWNER", "EKONOMI", "TANI / LOG", "GIRIS" };
+    const char* titles[] = { "OYUNCU", "AIM & ESP", "FISH SPAWNER", "EKONOMI", "TANI / LOG" };
     const char* desc[] = { "Hareket ve oyuncu korumalari", "Canli hedef secimi ve gorsellestirme",
         "Oyunun server komutuyla balik olustur", "Para, rulet ve kazanc ayarlari",
-        "Sistem durumu ve teknik kayitlar", "Lisans anahtari ile giris" };
+        "Sistem durumu ve teknik kayitlar" };
     ImGui::TextColored(ImVec4(1, .55f, .15f, 1), "%s", titles[page]);
     ImGui::TextDisabled("%s", desc[page]);
     ImGui::Separator();
@@ -369,8 +302,6 @@ void Draw() {
             if (ImGui::GetScrollY() >= ImGui::GetScrollMaxY() - 20) ImGui::SetScrollHereY(1.0f);
         }
         ImGui::EndChild();
-    } else {
-        LoginPage();
     }
     ImGui::EndChild();
     ImGui::End();

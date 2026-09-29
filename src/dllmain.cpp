@@ -5,7 +5,6 @@
 #include "renderer.h"
 #include "gui.h"
 #include "cheats.h"
-#include "auth.h"
 #include "mono_api.h"
 #include "silentaim.h"
 #include "casino.h"
@@ -60,7 +59,6 @@ static DWORD WINAPI MainThread(LPVOID) {
     }
     auto& st = State();
     st.Log("[*] Trainer v84 baslatildi.");
-    auth::Init(g_self); // kayitli lisans varsa otomatik giris dene (worker)
     // Mono biraz gec yuklenebilir; 30 sn'ye kadar bekle
     for (int i = 0; i < 300 && g_run; ++i) {
         if (MonoAPI::Get().Attach()) break;
@@ -95,8 +93,7 @@ static DWORD WINAPI MainThread(LPVOID) {
             renderer::ToggleMenuVisible(!renderer::IsMenuVisible());
             Sleep(200);
         }
-        // Hotkey'ler yalnizca giris sonrasi calisir (INSERT/HOME menu, END cikis haric).
-        if (auth::IsAuthed()) {
+        // Hotkey'ler dogrudan calisir (INSERT/HOME menu, END cikis).
         if (KeyPressed(VK_F1)) { cheats::ToggleGod(); gui::Notify("Olumsuzluk", State().godMode); Sleep(200); }
         if (KeyPressed(VK_F2)) { cheats::ToggleHunger(); gui::Notify("Aclik kilidi", State().noHunger); Sleep(200); }
         if (KeyPressed(VK_F3)) { State().airJump = !State().airJump;
@@ -112,7 +109,6 @@ static DWORD WINAPI MainThread(LPVOID) {
         if (KeyPressed(VK_F9)) { State().casinoWin = !State().casinoWin;
             gui::Notify("Casino Always-Win", State().casinoWin);
             State().Log(State().casinoWin ? "[+] Casino Always-Win acik" : "[-] Casino kapali"); Sleep(200); }
-        } // auth gate
 
         // Frame hook yoksa eski yol yalnizca yedek olarak kullanilir.
         if (!silentaim::HasFrameHook()) cheats::AirJumpTick();
